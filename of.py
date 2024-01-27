@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 # cap = cv2.VideoCapture('slow_traffic_small.mp4')
 # cap = cv2.VideoCapture('uav_1.mp4')
-cap = cv2.VideoCapture('uav_2.mp4')
+cap = cv2.VideoCapture('data/uav_2.mp4')
 
 ret, frame1 = cap.read()
 gframe_1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
@@ -26,6 +26,8 @@ while True:
     Ix = cv2.filter2D(gframe_1, -1, Mx)
     Iy = cv2.filter2D(gframe_1, -1, My)
     It = cv2.filter2D(gframe_1, -1, Mt) + cv2.filter2D(gframe_2, -1, -Mt)
+
+#    cv2.imshow("Ix", cv2.hconcat(Ix, Iy, It))
 
     # Subsample the features based on the grid
     fx = Ix.flatten()
