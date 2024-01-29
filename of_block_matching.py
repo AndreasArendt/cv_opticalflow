@@ -68,42 +68,10 @@ def main():
         current_subframe  = current_frame[current_frame_off[0]:current_frame_off[0]+BlockSize, current_frame_off[1]:current_frame_off[1]+BlockSize]
         previous_subframe = prev_frame[previous_frame_off[0]:previous_frame_off[0]+BlockSize, previous_frame_off[1]:previous_frame_off[1]+BlockSize]
                 
-        # DEBUG - start
-        large_current_frame = cv2.resize(current_frame.copy(), (448, 448), interpolation=cv2.INTER_NEAREST)
-        large_prev_frame = cv2.resize(prev_frame.copy(), (448, 448), interpolation=cv2.INTER_NEAREST)
-
-        current_frame_bgr = cv2.cvtColor(large_current_frame, cv2.COLOR_BAYER_BG2BGR)
-        previous_frame_bgr = cv2.cvtColor(large_prev_frame, cv2.COLOR_BAYER_BG2BGR)
-
-        scale_factor = 7
-
-        # Scale rectangle coordinates
-        scaled_current_frame_off = (current_frame_off[0] * scale_factor, current_frame_off[1] * scale_factor)
-        scaled_previous_frame_off = (previous_frame_off[0] * scale_factor, previous_frame_off[1] * scale_factor)
-
-        # Draw rectangles on the frames with scaled coordinates
-        current_rect_frame = cv2.rectangle(current_frame_bgr.copy(), (scaled_current_frame_off[1], scaled_current_frame_off[0]),
-                                        (scaled_current_frame_off[1] + BlockSize * scale_factor, scaled_current_frame_off[0] + BlockSize * scale_factor - 1),
-                                        [0, 0, 255], 1)
-        previous_rect_frame = cv2.rectangle(previous_frame_bgr.copy(), (scaled_previous_frame_off[1], scaled_previous_frame_off[0]),
-                                            (scaled_previous_frame_off[1] + BlockSize * scale_factor, scaled_previous_frame_off[0] + BlockSize * scale_factor - 1),
-                                            [0, 255, 0], 1)
-
-        top_row = np.hstack([previous_frame_bgr, current_frame_bgr])
-        bottom_row = np.hstack([previous_rect_frame, current_rect_frame])
-        splot = np.vstack([top_row, bottom_row])
-
-        # Display the result
-        cv2.imshow('Image Grid', splot)
-        cv2.waitKey(1)                        
-        # DEBUG - end
-
-        prev_rect = cv2.rectangle(prev_frame.copy(), (previous_frame_off[1], previous_frame_off[0] ), (previous_frame_off[1]+BlockSize, previous_frame_off[0]+BlockSize-1), [0,255,0], 1)           
-        prev_rect = cv2.resize(prev_rect, (448, 448), interpolation=cv2.INTER_NEAREST)
-      
         # Calc Optical Flow
-        u, v, flow_u, flow_v = CalcFlow(current_subframe, previous_subframe)        
+        u, v, flow_u, flow_v, Ix, Iy, It = CalcFlow(current_subframe, previous_subframe)        
         
+        DebugPlot(current_frame, current_frame_off, prev_frame, previous_frame_off, Ix, Iy ,It)
         print(str(u) + ", " + str(v), ", ssd: " + str(ssd))
 
         u_arr = np.append(u_arr,u)
@@ -132,7 +100,60 @@ def main():
     # Save the combined array to a CSV file
     np.savetxt('./out.csv', combined_array, delimiter=',', header='u_arr,v_arr', comments='')
 
+last_It = None
+def DebugPlot(current_frame, current_frame_off, prev_frame, previous_frame_off, Ix, Iy ,It):
+    global last_It
 
+    # DEBUG - start
+    large_current_frame = cv2.resize(current_frame.copy(), (448, 448), interpolation=cv2.INTER_NEAREST)
+    large_prev_frame = cv2.resize(prev_frame.copy(), (448, 448), interpolation=cv2.INTER_NEAREST)
+
+    current_frame_bgr = cv2.cvtColor(large_current_frame, cv2.COLOR_BAYER_BG2BGR)
+    previous_frame_bgr = cv2.cvtColor(large_prev_frame, cv2.COLOR_BAYER_BG2BGR)
+
+    scale_factor = 7
+
+    # Scale rectangle coordinates
+    scaled_current_frame_off = (current_frame_off[0] * scale_factor, current_frame_off[1] * scale_factor)
+    scaled_previous_frame_off = (previous_frame_off[0] * scale_factor, previous_frame_off[1] * scale_factor)
+
+    # Draw rectangles on the frames with scaled coordinates
+    current_rect_frame = cv2.rectangle(current_frame_bgr.copy(), (scaled_current_frame_off[1], scaled_current_frame_off[0]),
+                                    (scaled_current_frame_off[1] + BlockSize * scale_factor, scaled_current_frame_off[0] + BlockSize * scale_factor - 1),
+                                    [0, 0, 255], 1)
+    previous_rect_frame = cv2.rectangle(previous_frame_bgr.copy(), (scaled_previous_frame_off[1], scaled_previous_frame_off[0]),
+                                        (scaled_previous_frame_off[1] + BlockSize * scale_factor, scaled_previous_frame_off[0] + BlockSize * scale_factor - 1),
+                                        [0, 255, 0], 1)
+
+
+    if last_It is None:
+        last_It = It.copy()
+
+    current_large_It = cv2.resize(It.copy(), (448, 448), interpolation=cv2.INTER_NEAREST)
+    previous_large_It  = cv2.resize(last_It.copy(), (448, 448), interpolation=cv2.INTER_NEAREST)
+
+    current_It_bgr = cv2.cvtColor(current_large_It, cv2.COLOR_BAYER_BG2BGR)
+    previous_It_bgr = cv2.cvtColor(previous_large_It, cv2.COLOR_BAYER_BG2BGR)
+
+    current_It_rect_frame = cv2.rectangle(current_It_bgr, (scaled_current_frame_off[1], scaled_current_frame_off[0]),
+                                        (scaled_current_frame_off[1] + BlockSize * scale_factor, scaled_current_frame_off[0] + BlockSize * scale_factor - 1),
+                                        [0, 0, 255], 1)
+    
+    previous_It_rect_frame = cv2.rectangle(previous_It_bgr, (scaled_previous_frame_off[1], scaled_previous_frame_off[0]),
+                                        (scaled_previous_frame_off[1] + BlockSize * scale_factor, scaled_previous_frame_off[0] + BlockSize * scale_factor - 1),
+                                        [0, 255, 0], 1)
+       
+    
+    top_row = np.hstack([previous_rect_frame, current_rect_frame])
+    bottom_row = np.hstack([previous_It_rect_frame, current_It_rect_frame])
+    splot = np.vstack([top_row, bottom_row])
+
+    last_It = last_It = It.copy()
+
+    # Display the result
+    cv2.imshow('Image Grid', splot)
+    cv2.waitKey(1)                        
+    # DEBUG - end
 
 def BlockMatching(macro_block, previous_frame):
     # offset - shifting
@@ -185,7 +206,7 @@ def CalcFlow(current_frame, previous_frame):
     Iy = cv2.filter2D(previous_frame, -1, My)
     It = cv2.filter2D(previous_frame, -1, Mt) + cv2.filter2D(current_frame, -1, -Mt)
             
-    # cv2.imshow("Ix", cv2.resize(cv2.hconcat([Ix, Iy, It]), (448, 448), interpolation=cv2.INTER_NEAREST))
+    # cv2.imshow("Ix", cv2.resize(cv2.hconcat([Ix, Iy, It]), (448*3, 448), interpolation=cv2.INTER_NEAREST))
     # cv2.waitKey(1)
 
     # Subsample the features based on the grid
@@ -202,7 +223,7 @@ def CalcFlow(current_frame, previous_frame):
     flow_u = u * Ix
     flow_v = v * Iy
 
-    return u, v, flow_u, flow_v
+    return u, v, flow_u, flow_v, Ix, Iy, It
 
 if __name__ == "__main__":
     main()
