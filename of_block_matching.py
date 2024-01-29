@@ -70,21 +70,16 @@ def main():
                 
         # Calc Optical Flow
         u, v, flow_u, flow_v, Ix, Iy, It = CalcFlow(current_subframe, previous_subframe)        
+        #u, v, flow_u, flow_v, Ix, Iy, It = CalcFlow(current_frame, prev_frame)        
         
-        DebugPlot(current_frame, current_frame_off, prev_frame, previous_frame_off, Ix, Iy ,It)
-        print(str(u) + ", " + str(v), ", ssd: " + str(ssd))
+        debug = False
+        if debug == True:
+            DebugPlot(current_frame, current_frame_off, prev_frame, previous_frame_off, Ix, Iy ,It)
+            print(str(u) + ", " + str(v), ", ssd: " + str(ssd))
 
         u_arr = np.append(u_arr,u)
         v_arr = np.append(v_arr,v)
-
-        # plt.subplot(1,2,1)
-        # plt.plot(fcnt, u, marker='.', color='blue')
-
-        # plt.subplot(1,2,2)
-        # plt.plot(fcnt, v, marker='.', color='blue')
-
-        # plt.pause(1e-10)
-
+       
         prev_frame = current_frame
 
         if cv2.waitKey(1) & 0xFF == 27:  # Press 'Esc' to exit
@@ -200,28 +195,33 @@ def CalcFlow(current_frame, previous_frame):
     My = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]])
 
     # Combined filter for temporal gradient
-    Mt = np.array([1]) - np.array([-1])
+    Mt = np.array([1, 1]) - np.array([-1, -1])
+    Mt = Mt.reshape((-1, 1))  # Reshape to a column vector
 
     Ix = cv2.filter2D(previous_frame, -1, Mx)
     Iy = cv2.filter2D(previous_frame, -1, My)
     It = cv2.filter2D(previous_frame, -1, Mt) + cv2.filter2D(current_frame, -1, -Mt)
-            
-    # cv2.imshow("Ix", cv2.resize(cv2.hconcat([Ix, Iy, It]), (448*3, 448), interpolation=cv2.INTER_NEAREST))
-    # cv2.waitKey(1)
-
-    # Subsample the features based on the grid
+    
     fx = Ix.flatten()
     fy = Iy.flatten()
     ft = It.flatten()
 
     A = np.vstack((fx, fy)).T
-    y_subsampled = -ft
+    y = -ft
 
-    u, v = np.linalg.lstsq(A, y_subsampled, rcond=None)[0]
+    u, v = np.linalg.lstsq(A, y, rcond=None)[0]
 
     # Optionally, visualize the full-resolution optical flow
     flow_u = u * Ix
     flow_v = v * Iy
+
+    debug = False
+    if debug == True:
+        plt.figure(1)
+        plt.cla()
+        plt.imshow(previous_frame, cmap='gray')
+        plt.quiver(np.arange(0, previous_frame.shape[1]), np.arange(0, previous_frame.shape[0]), u, v, color='red', scale=100)
+        plt.pause(1e-3)
 
     return u, v, flow_u, flow_v, Ix, Iy, It
 
