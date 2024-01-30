@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 BlockSize   = 16 #80 # Block Size of chunks (must be gcd of width/height)
-MaxMovement = 24 # maximum movement of rectangle from starting point
+MaxMovement = 16 # maximum movement of rectangle from starting point
 
 def main():
 
@@ -44,9 +44,14 @@ def main():
         current_frame_off = np.Inf, np.Inf
         previous_frame_off = np.Inf, np.Inf
 
+
+
+        # TODO: iterate from 0:WIDTH and 0:HEIGHT as otherwise movement from border to center will be ignored!
+
+
         # iterate over each column, row in previous frame
-        for c in range(MaxMovement//2, WIDTH-MaxMovement//2, BlockSize):
-            for r in range(MaxMovement//2, HEIGHT-MaxMovement//2, BlockSize):        
+        for c in range(MaxMovement, WIDTH-MaxMovement, BlockSize):
+            for r in range(MaxMovement, HEIGHT-MaxMovement, BlockSize):        
                 # limit row and column indices
                 c_idx_st = np.max([c-MaxMovement, 0])
                 c_idx_en = np.min([c+MaxMovement+BlockSize, WIDTH])
@@ -65,6 +70,9 @@ def main():
                     current_frame_off = r,c
                     previous_frame_off = r_off+r_idx_st, c_off+c_idx_st
                  
+        
+        print(str(r_off) + ", " + str(c_off))
+
         current_subframe  = current_frame[current_frame_off[0]:current_frame_off[0]+BlockSize, current_frame_off[1]:current_frame_off[1]+BlockSize]
         previous_subframe = prev_frame[previous_frame_off[0]:previous_frame_off[0]+BlockSize, previous_frame_off[1]:previous_frame_off[1]+BlockSize]
                 
@@ -72,7 +80,7 @@ def main():
         u, v, flow_u, flow_v, Ix, Iy, It = CalcFlow(current_subframe, previous_subframe)        
         #u, v, flow_u, flow_v, Ix, Iy, It = CalcFlow(current_frame, prev_frame)        
         
-        debug = False
+        debug = True
         if debug == True:
             DebugPlot(current_frame, current_frame_off, prev_frame, previous_frame_off, Ix, Iy ,It)
             print(str(u) + ", " + str(v), ", ssd: " + str(ssd))
@@ -150,10 +158,10 @@ def DebugPlot(current_frame, current_frame_off, prev_frame, previous_frame_off, 
     cv2.waitKey(1)                        
     # DEBUG - end
 
-def BlockMatching(macro_block, previous_frame):
+def BlockMatching(macro_block, prev_block):
     # offset - shifting
-    max_c = macro_block.shape[1] - previous_frame.shape[1]
-    max_r = macro_block.shape[0] - previous_frame.shape[0]
+    max_c = macro_block.shape[1] - prev_block.shape[1]
+    max_r = macro_block.shape[0] - prev_block.shape[0]
 
     best_ssd = np.inf
 
@@ -162,7 +170,7 @@ def BlockMatching(macro_block, previous_frame):
     for c_off in range(0,max_c,STEPSIZE):
         for r_off in range(0,max_r,STEPSIZE):
             m = macro_block[r_off:r_off+BlockSize, c_off:c_off+BlockSize]
-            p = previous_frame
+            p = prev_block
 
             # Calculate Sum of Squared Differences (SSD) metric
             ssd = np.sum((m - p) ** 2)
@@ -172,20 +180,27 @@ def BlockMatching(macro_block, previous_frame):
                 best_ssd = ssd
                 best_match_c = c_off
                 best_match_r = r_off
-            
-            debug = False
-            if debug:
-                rect_frame = cv2.rectangle(macro_block.copy(), (c_off, r_off) , (c_off+BlockSize-1, r_off+BlockSize-1), [0,0,255], 1)                                   
-                rect_frame_resize = cv2.resize(rect_frame, (448, 448), interpolation=cv2.INTER_NEAREST)
-                mpd = cv2.hconcat([m, p, m-p])
-                mpd_resize = cv2.resize(mpd, (448, 448), interpolation=cv2.INTER_NEAREST)
 
-                cv2.imshow("macro_block", rect_frame_resize)
-                cv2.imshow("curr + prev + delta", mpd_resize)
-                cv2.waitKey(1)
-            
-    #print("Best ssd: " + str(best_ssd))
-    #print("at: " + str(c_off) +  ", " + str(r_off))
+            debug = False
+            if debug == True:       
+                large_prev_block = cv2.resize(prev_block.copy(), (448, 448), interpolation=cv2.INTER_NEAREST)
+                large_macro_block = cv2.resize(macro_block.copy(), (448, 448), interpolation=cv2.INTER_NEAREST)
+                
+                prev_block_bgr = cv2.cvtColor(large_prev_block, cv2.COLOR_BAYER_BG2BGR)
+                macro_block_bgr = cv2.cvtColor(large_macro_block, cv2.COLOR_BAYER_BG2BGR)
+
+                scale_factor = 448//(2*MaxMovement+BlockSize)
+                scaled_frame = (r_off * scale_factor, c_off * scale_factor)
+
+                # Draw rectangles on the frames with scaled coordinates
+                rect = cv2.rectangle(macro_block_bgr.copy(), (scaled_frame[1], scaled_frame[0]),
+                                        (scaled_frame[1] + BlockSize * scale_factor, scaled_frame[0] + BlockSize * scale_factor - 1),
+                                        [0, 0, 255], 1)
+
+                splot = np.hstack([rect, prev_block_bgr])
+                cv2.imshow('Image Grid', splot)
+                cv2.waitKey(1)  
+                a = 1
 
     return best_ssd, best_match_c, best_match_r
 
