@@ -3,18 +3,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 BlockSize   = 16 #80 # Block Size of chunks (must be gcd of width/height)
-MaxMovement = 64-16 # maximum movement of rectangle from starting point
+MaxMovement = 64-16-16 # maximum movement of rectangle from starting point
 
 def main():
 
     # Capture video from file or camera
     # cap = cv2.VideoCapture('slow_traffic_small.mp4')
     # cap = cv2.VideoCapture('uav_1.mp4')
-    # cap = cv2.VideoCapture('data/uav_2.mp4')
+    #cap = cv2.VideoCapture('data/uav_2.mp4')
     cap = cv2.VideoCapture('data/vid.mp4')
 
     #skip first frames
-    for i in range(1,1599):#+75):
+    for i in range(1,1599):
         ret, frame = cap.read()       
 
     # find blocks from prev_frame in current_frame
@@ -25,19 +25,16 @@ def main():
 
     u_arr = np.array([])
     v_arr = np.array([])
-
-
-    # frame = cv2.imread('data/clinic/img1.png')
-    # prev_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    elev_arr = np.array([])
+    azi_arr = np.array([])
+    ssd_arr = np.array([])
 
     HEIGHT = frame.shape[0]
     WIDTH = frame.shape[1]
 
-    #while True:
-    for ii in range(1,700):# range(1,700):
+    for ii in range(1,700):
         ret, frame = cap.read()       
 
-        #frame = cv2.imread('data/clinic/img' + str(ii) + '.png')
         current_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         print("Processing frame: " + str(ii))
         
@@ -49,17 +46,7 @@ def main():
         best_ssd = np.Inf
         current_frame_off = np.Inf, np.Inf
         previous_frame_off = np.Inf, np.Inf
-
-        
-        # row,col,ch= frame.shape
-        # mean = 0
-        # var = 0.5
-        # sigma = var**0.5
-        # gauss = np.random.normal(mean,sigma,(row,col,ch))
-        # gauss = gauss.reshape(row,col,ch)
-        # gauss = gauss.astype(np.uint8)
-        # current_frame = cv2.cvtColor(frame + gauss, cv2.COLOR_BGR2GRAY)
-
+       
         # iterate over each column, row in previous frame
         for c in range(0, WIDTH-MaxMovement+1, BlockSize):            
             for r in range(0, HEIGHT-MaxMovement+1, BlockSize):        
@@ -88,9 +75,8 @@ def main():
         previous_subframe = prev_frame[previous_frame_off[0]:previous_frame_off[0]+BlockSize, previous_frame_off[1]:previous_frame_off[1]+BlockSize]
                 
         # Calc Optical Flow
-        u, v, flow_u, flow_v, Ix, Iy, It = CalcFlow(current_subframe, previous_subframe)        
-        #_u, _v, _flow_u, _flow_v, _Ix, _Iy, _It = CalcFlow(current_frame, prev_frame)        
-        
+        u, v, flow_u, flow_v, Ix, Iy, It, elevation, azimuth = CalcFlow(current_subframe, previous_subframe)        
+                
         debug = True
         if debug == True:
             DebugPlot(current_frame, current_frame_off, prev_frame, previous_frame_off, Ix, Iy ,It)
@@ -98,7 +84,10 @@ def main():
 
         u_arr = np.append(u_arr,u)
         v_arr = np.append(v_arr,v)
-       
+        azi_arr = np.append(azi_arr, azimuth)
+        elev_arr = np.append(elev_arr, elevation)
+        ssd_arr = np.append(ssd_arr, ssd)
+
         prev_frame = current_frame
 
         if cv2.waitKey(1) & 0xFF == 27:  # Press 'Esc' to exit
@@ -109,10 +98,10 @@ def main():
     cv2.destroyAllWindows()
     cap.release()
 
-    combined_array = np.column_stack((u_arr, v_arr))
+    combined_array = np.column_stack((u_arr, v_arr, azi_arr, elev_arr, ssd_arr))
 
     # Save the combined array to a CSV file
-    np.savetxt('./out.csv', combined_array, delimiter=',', header='u_arr,v_arr', comments='')
+    np.savetxt('./out.csv', combined_array, delimiter=',', header='u_arr,v_arr, azimut, elevation, ssd', comments='')
 
 last_It = None
 def DebugPlot(current_frame, current_frame_off, prev_frame, previous_frame_off, Ix, Iy ,It):
@@ -221,7 +210,7 @@ def BlockMatching(macro_block, prev_block):
 def CalcFlow(current_frame, previous_frame):
     # Sobel operator for edge detection in the x-direction and y-direction
     Mx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
-    My = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]])
+    My = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]]).T
 
     # Combined filter for temporal gradient
     Mt = np.array([1, 1]) - np.array([-1, -1])
@@ -230,7 +219,12 @@ def CalcFlow(current_frame, previous_frame):
     Ix = cv2.filter2D(previous_frame, -1, Mx)
     Iy = cv2.filter2D(previous_frame, -1, My)
     It = cv2.filter2D(previous_frame, -1, Mt) + cv2.filter2D(current_frame, -1, -Mt)
-    
+
+    cv2.imshow('Ix', cv2.resize(Ix, (448, 448), interpolation=cv2.INTER_NEAREST))
+    cv2.imshow('Iy', cv2.resize(Iy, (448, 448), interpolation=cv2.INTER_NEAREST))
+    cv2.imshow('It', cv2.resize(It, (448, 448), interpolation=cv2.INTER_NEAREST))
+    cv2.waitKey(1)
+
     fx = Ix.flatten()
     fy = Iy.flatten()
     ft = It.flatten()
@@ -239,7 +233,7 @@ def CalcFlow(current_frame, previous_frame):
     y = -ft
 
     u, v = np.linalg.lstsq(A, y, rcond=None)[0]
-
+    
     # Optionally, visualize the full-resolution optical flow
     flow_u = u * Ix
     flow_v = v * Iy
@@ -252,7 +246,10 @@ def CalcFlow(current_frame, previous_frame):
         plt.quiver(np.arange(0, previous_frame.shape[1]), np.arange(0, previous_frame.shape[0]), u, v, color='red', scale=100)
         plt.pause(1e-3)
 
-    return u, v, flow_u, flow_v, Ix, Iy, It
+    elevation = 1 / np.sqrt(u * u + v * v)
+    azimuth = np.sign(v) * u / np.sqrt(u * u + v * v)
+
+    return u, v, flow_u, flow_v, Ix, Iy, It, elevation, azimuth
 
 if __name__ == "__main__":
     main()
