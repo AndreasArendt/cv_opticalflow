@@ -20,18 +20,24 @@ def main():
     # find blocks from prev_frame in current_frame
     ret, frame = cap.read()       
     prev_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-    HEIGHT = frame.shape[0]
-    WIDTH = frame.shape[1]
-
+  
     fcnt = 0
 
     u_arr = np.array([])
     v_arr = np.array([])
 
+
+    # frame = cv2.imread('data/clinic/img1.png')
+    # prev_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    HEIGHT = frame.shape[0]
+    WIDTH = frame.shape[1]
+
     #while True:
-    for ii in range(1,700):
+    for ii in range(1,700):# range(1,700):
         ret, frame = cap.read()       
+
+        #frame = cv2.imread('data/clinic/img' + str(ii) + '.png')
         current_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         print("Processing frame: " + str(ii))
         
@@ -39,13 +45,23 @@ def main():
 
         if not ret:
             break        
-        
+
         best_ssd = np.Inf
         current_frame_off = np.Inf, np.Inf
         previous_frame_off = np.Inf, np.Inf
 
+        
+        # row,col,ch= frame.shape
+        # mean = 0
+        # var = 0.5
+        # sigma = var**0.5
+        # gauss = np.random.normal(mean,sigma,(row,col,ch))
+        # gauss = gauss.reshape(row,col,ch)
+        # gauss = gauss.astype(np.uint8)
+        # current_frame = cv2.cvtColor(frame + gauss, cv2.COLOR_BGR2GRAY)
+
         # iterate over each column, row in previous frame
-        for c in range(0, WIDTH-MaxMovement+1, BlockSize):
+        for c in range(0, WIDTH-MaxMovement+1, BlockSize):            
             for r in range(0, HEIGHT-MaxMovement+1, BlockSize):        
                 # limit row and column indices
                 c_idx_st = np.max([c-MaxMovement, 0])
@@ -56,14 +72,14 @@ def main():
 
                 macro_block = current_frame[r_idx_st:r_idx_en, c_idx_st:c_idx_en]
                 prev_block = prev_frame[r:r+BlockSize, c:c+BlockSize]
-                
+                              
                 # run block matching
                 ssd, c_off, r_off = BlockMatching(macro_block, prev_block)
-
-                if ssd < best_ssd:
+                
+                if ssd < best_ssd and ssd > 0:
                     best_ssd = ssd
-                    current_frame_off = r,c
-                    previous_frame_off = r_off+r_idx_st, c_off+c_idx_st
+                    current_frame_off = r_off+r_idx_st, c_off+c_idx_st
+                    previous_frame_off = r,c
                  
         
         print(str(r_off) + ", " + str(c_off))
@@ -73,7 +89,7 @@ def main():
                 
         # Calc Optical Flow
         u, v, flow_u, flow_v, Ix, Iy, It = CalcFlow(current_subframe, previous_subframe)        
-        #u, v, flow_u, flow_v, Ix, Iy, It = CalcFlow(current_frame, prev_frame)        
+        #_u, _v, _flow_u, _flow_v, _Ix, _Iy, _It = CalcFlow(current_frame, prev_frame)        
         
         debug = True
         if debug == True:
@@ -109,7 +125,7 @@ def DebugPlot(current_frame, current_frame_off, prev_frame, previous_frame_off, 
     current_frame_bgr = cv2.cvtColor(large_current_frame, cv2.COLOR_BAYER_BG2BGR)
     previous_frame_bgr = cv2.cvtColor(large_prev_frame, cv2.COLOR_BAYER_BG2BGR)
 
-    scale_factor = 7
+    scale_factor = 448//current_frame.shape[0]
 
     # Scale rectangle coordinates
     scaled_current_frame_off = (current_frame_off[0] * scale_factor, current_frame_off[1] * scale_factor)
@@ -159,6 +175,8 @@ def BlockMatching(macro_block, prev_block):
     max_r = macro_block.shape[0] - prev_block.shape[0]
 
     best_ssd = np.inf
+    best_match_c = np.inf
+    best_match_r = np.inf
 
     STEPSIZE = 1 # parameter to play around - improves performance, with precision loss
 
@@ -170,15 +188,15 @@ def BlockMatching(macro_block, prev_block):
             ssd = np.sum((m - prev_block) ** 2)
 
             # Update best match if the current SSD is smaller
-            if ssd < best_ssd:
+            if ssd < best_ssd and ssd > 0:
                 best_ssd = ssd
                 best_match_c = c_off
                 best_match_r = r_off
 
             debug = False
             if debug == True:                      
-                large_macro_block = cv2.resize(macro_block.copy(), (448, 448), interpolation=cv2.INTER_NEAREST)                
-                large_prev_block = cv2.resize(prev_block.copy(), (448, 448), interpolation=cv2.INTER_NEAREST)                
+                large_macro_block = cv2.resize(macro_block, (448, 448), interpolation=cv2.INTER_NEAREST)                
+                large_prev_block = cv2.resize(prev_block, (448, 448), interpolation=cv2.INTER_NEAREST)                
 
                 macro_block_bgr = cv2.cvtColor(large_macro_block, cv2.COLOR_BAYER_BG2BGR)
                 prev_block_bgr = cv2.cvtColor(large_prev_block, cv2.COLOR_BAYER_BG2BGR)
