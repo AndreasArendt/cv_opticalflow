@@ -1,7 +1,8 @@
 import numpy as np
 import cv2 as cv
 
-cap = cv.VideoCapture('slow_traffic_small.mp4')
+#cap = cv.VideoCapture('slow_traffic_small.mp4')
+cap = cv.VideoCapture('data/vid.mp4')
 
 # params for ShiTomasi corner detection
 feature_params = dict( maxCorners = 5,
@@ -9,7 +10,7 @@ feature_params = dict( maxCorners = 5,
                        minDistance = 7,
                        blockSize = 7 )
 # Parameters for lucas kanade optical flow
-lk_params = dict( winSize  = (15, 15),
+lk_params = dict( winSize  = (8, 8),
                   maxLevel = 2,
                   criteria = (cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.03))
 # Create some random colors
