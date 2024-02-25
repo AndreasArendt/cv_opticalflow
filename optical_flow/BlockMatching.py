@@ -24,24 +24,27 @@ def BlockMatching(macro_block, prev_block, BlockSize):
                 best_ssd = ssd
                 best_match_c = c_off
                 best_match_r = r_off
+       
+            debug2 = False
+            if debug2 == True:
+                HEIGHT = macro_block.shape[0]*3
+                WIDTH = macro_block.shape[1]*3
 
-            debug = False
-            if debug == True:
-                large_macro_block = cv2.resize(macro_block, (448, 448), interpolation=cv2.INTER_NEAREST)
-                large_prev_block = cv2.resize(prev_block, (448, 448), interpolation=cv2.INTER_NEAREST)
+                large_macro_block = cv2.resize(macro_block, (WIDTH, HEIGHT), interpolation=cv2.INTER_NEAREST)
+                large_prev_block = cv2.resize(prev_block, (WIDTH, HEIGHT), interpolation=cv2.INTER_NEAREST)
 
                 macro_block_bgr = cv2.cvtColor(large_macro_block, cv2.COLOR_BAYER_BG2BGR)
                 prev_block_bgr = cv2.cvtColor(large_prev_block, cv2.COLOR_BAYER_BG2BGR)
 
-                row_scale_factor = 448//macro_block.shape[0]
-                col_scale_factor = 448//macro_block.shape[1]
+                row_scale_factor = HEIGHT//macro_block.shape[0]
+                col_scale_factor = WIDTH//macro_block.shape[1]
                 scaled_frame = (r_off * row_scale_factor, c_off * col_scale_factor)
 
-                # Draw rectangles on the frames with scaled coordinates
+                # Draw rectangles on the frames with scaled coordinates 
                 rect = cv2.rectangle(macro_block_bgr.copy(), (scaled_frame[1], scaled_frame[0]),
-                                        (scaled_frame[1] + BlockSize * col_scale_factor -1, scaled_frame[0] + BlockSize * row_scale_factor -1),
+                                        (scaled_frame[1] + BlockSize * col_scale_factor, scaled_frame[0] + BlockSize * row_scale_factor),
                                         [0, 0, 255], 1)
-                rect = cv2.rectangle(rect, (0,0,), (448 -2, 448 -2),
+                rect = cv2.rectangle(rect, (0,0,), (HEIGHT -2, WIDTH -2),
                                         [255, 0, 255], 1)
 
                 splot = np.hstack([rect, prev_block_bgr])
