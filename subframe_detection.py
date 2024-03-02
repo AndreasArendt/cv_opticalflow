@@ -23,7 +23,7 @@ Start_y = int(HEIGHT/2-BlockSize/2)
 while(ret):    
     previous_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    for i in range(1,30):
+    for i in range(1,10):
         ret, frame = cap.read()
 
     x = Start_x
@@ -72,9 +72,12 @@ while(ret):
                 previous_frame_off = r,c
 
             
-            current_subframe  = current_frame[current_frame_off[0]:current_frame_off[0]+BlockSize, current_frame_off[1]:current_frame_off[1]+BlockSize]
-            previous_subframe = previous_frame[previous_frame_off[0]:previous_frame_off[0]+BlockSize, previous_frame_off[1]:previous_frame_off[1]+BlockSize]
+            #current_subframe  = current_frame[current_frame_off[0]:current_frame_off[0]+BlockSize, current_frame_off[1]:current_frame_off[1]+BlockSize]
+            #previous_subframe = previous_frame[previous_frame_off[0]:previous_frame_off[0]+BlockSize, previous_frame_off[1]:previous_frame_off[1]+BlockSize]
                 
+            current_subframe  = current_frame[previous_frame_off[0]:previous_frame_off[0]+BlockSize, previous_frame_off[1]:previous_frame_off[1]+BlockSize]
+            previous_subframe = previous_frame[previous_frame_off[0]:previous_frame_off[0]+BlockSize, previous_frame_off[1]:previous_frame_off[1]+BlockSize]
+
             # Calc Optical Flow
             u, v, flow_u, flow_v, Ix, Iy, It = CalcFlow(current_subframe, previous_subframe)      
             
@@ -91,21 +94,37 @@ while(ret):
             #previous_frame_rect_frame = cv2.rectangle(previous_frame_rect_frame, (c_idx_st, r_idx_st), (c_idx_en-1, r_idx_en-1), [0, 255, 255], 1) 
 
             # draw rectangle of object in current frame
-            current_frame_rect_frame = cv2.rectangle(current_frame_bgr, (current_frame_off[1], current_frame_off[0]),
-                                                (current_frame_off[1] + BlockSize, current_frame_off[0] + BlockSize),
-                                                [0, 0, 255], 1)       
+            # current_frame_rect_frame = cv2.rectangle(current_frame_bgr, (current_frame_off[1], current_frame_off[0]),
+            #                                     (current_frame_off[1] + BlockSize, current_frame_off[0] + BlockSize),
+            #                                     [0, 0, 255], 1)       
+
+            current_frame_rect_frame = cv2.rectangle(current_frame_bgr, (c, r),
+                                                (c + BlockSize, r + BlockSize),
+                                                [0, 0, 255], 1)     
 
             # draw rectangle of allowed movement in current frame
             #current_frame_rect_frame = cv2.rectangle(current_frame_rect_frame, (c_idx_st, r_idx_st), (c_idx_en-1, r_idx_en-1), [0, 255, 255], 1) 
 
-            u_norm = int(u / (np.sqrt( u**2 + v**2 )) * 16)
-            v_norm = int(v / (np.sqrt( u**2 + v**2 )) * 16)            
-            arrow_x_st = current_frame_off[1] + BlockSize // 2
-            arrow_y_st = current_frame_off[0] + BlockSize // 2
-            arrow_x_en = current_frame_off[1] + BlockSize // 2 + v_norm
-            arrow_y_en = current_frame_off[0] + BlockSize // 2 + u_norm
+            uv = np.max([1e-5, np.sqrt( u**2 + v**2 )])
+            u_norm = int((u / uv) * 16)
+            v_norm = int((v / uv) * 16)
 
-            current_frame_rect_frame = cv2.arrowedLine(current_frame_rect_frame, (arrow_x_st, arrow_y_st), (arrow_x_en, arrow_y_en), [0, 255, 0], 1)  
+            u_norm = int(u) * 10
+            v_norm = int(v) * 10
+
+            arrow_x_st = previous_frame_off[1] + BlockSize // 2
+            arrow_y_st = previous_frame_off[0] + BlockSize // 2
+            arrow_x_en = previous_frame_off[1] + BlockSize // 2 + u_norm
+            arrow_y_en = previous_frame_off[0] + BlockSize // 2 + v_norm
+
+            arrow2_x_st = previous_frame_off[1] + BlockSize // 2
+            arrow2_y_st = previous_frame_off[0] + BlockSize // 2
+            arrow2_x_en = current_frame_off[1] + BlockSize // 2
+            arrow2_y_en = current_frame_off[0] + BlockSize // 2
+
+
+            current_frame_rect_frame = cv2.arrowedLine(current_frame_rect_frame, (arrow_x_st, arrow_y_st), (arrow_x_en, arrow_y_en), [0, 255, 0], 1) 
+            #current_frame_rect_frame = cv2.arrowedLine(current_frame_rect_frame, (arrow2_x_st, arrow2_y_st), (arrow2_x_en, arrow2_y_en), [0, 255, 255], 1)  
 
             splot = np.hstack([previous_frame_rect_frame, current_frame_rect_frame])
             
@@ -125,7 +144,7 @@ while(ret):
             theta_arr = np.append(theta_arr, theta)
             ssd_arr = np.append(ssd_arr, ssd)
 
-            print("u: " + str(u) + " v: " + str(v))
+            print("u: " + str(u) + " v: " + str(v) + " uv: " + str(np.sqrt(u**2 + v**2)))
             print("ssd: " + str(best_ssd))
 
             a = 1   
